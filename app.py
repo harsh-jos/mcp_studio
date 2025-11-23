@@ -1,6 +1,8 @@
 import streamlit as st
 from mcp_use import MCPAgent, MCPClient
 from langchain_google_genai import ChatGoogleGenerativeAI
+import asyncio
+import json
 
 st.set_page_config(page_title="MCP Studio", page_icon="Rb")
 st.title("MCP Studio")
@@ -9,7 +11,14 @@ st.title("MCP Studio")
 st.sidebar.title("Configuration")
 gemini_api_key = st.sidebar.text_input("Gemini API Key", type="password")
 
-st.sidebar.text_input("MCP Config File", value="mcp_config.json", key="mcp_config_file")
+default_config = '{"mcpServers": {"docs-langchain": {"url": "https://docs.langchain.com/mcp"}}}'
+config_str = st.sidebar.text_area("MCP Config", value=default_config, key="mcp_config", height=200)
+
+try:
+    config = json.loads(config_str)
+except json.JSONDecodeError:
+    st.error("Invalid JSON in MCP Config")
+    st.stop()
 
 if not gemini_api_key:
     st.warning("Please enter your Gemini API Key in the sidebar to continue.")
@@ -19,11 +28,10 @@ if not gemini_api_key:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Cache the Agent initialization to avoid recreating it on every rerun
-@st.cache_resource
+# Initialize the Agent (no caching to avoid event loop issues)
 def get_agent(api_key):
-    # Initialize MCP Client from config file
-    client = MCPClient.from_config_file(st.session_state.mcp_config_file)
+    # Initialize MCP Client from the dict
+    client = MCPClient.from_dict(config)
     
     # Initialize Gemini Model using LangChain wrapper
     # Using gemini-2.5-flash as requested
